@@ -1,0 +1,72 @@
+﻿<!--  Copyright (c) Microsoft. All rights reserved. Licensed under the MIT license.
+        See LICENSE in the source repository root for complete license information. -->
+@using Resources
+@using Microsoft_Teams_Graph_RESTAPIs_Connect.Models;
+@using Microsoft_Teams_Graph_RESTAPIs_Connect.Views;
+@using System.Linq.Expressions;
+
+@model FormOutput
+
+@if (!GraphAPI.Web.Controllers.HomeController.hasAppId)
+{
+    <div style="color: red; font-size: 30pt">You need to register this application and provide an app secret, see README.md for details.</div>
+}
+
+<br />
+
+<div id="idOra">
+</div>
+
+<script type="text/javascript">
+
+        // Timer function
+        function getTimeFromserver() {
+            $.ajax({
+                type: "POST",
+                traditional: true,
+                url: 'Home/Ora',
+                data: { TRP: '1' },
+                success: function (html) {
+                    $('#idOra').html(html);
+                }
+            });
+        }
+
+        // Timer function
+        $(document).ready(function () { 
+            getTimeFromserver();
+            setInterval('getTimeFromserver();', 600000);
+        });
+
+</script>
+
+<style>
+    table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    th, td {
+        text-align: left;
+        padding: 8px;
+    }
+
+    tr:nth-child(even) {
+        background-color: #f2f2f2
+    }
+
+    th {
+        background-color: #4CAF50;
+        color: white;
+    }
+</style>
+
+<script>
+
+    function onSuccess(result) {
+        $('#Result').html(result);
+        $('#Result').show();
+    }
+
+</script>
+

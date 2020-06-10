@@ -1,0 +1,101 @@
+﻿body {
+    padding-top: 50px;
+    padding-bottom: 20px;
+}
+
+/* Set padding to keep content from hitting the edges */
+.body-content {
+    padding-left: 15px;
+    padding-right: 15px;
+}
+
+.bluerow {
+    background-color: lavender
+}
+
+label {
+    margin-right: 12px;
+}
+
+/* DivTable.com */
+.divTable {
+    display: table;
+    float: left;
+    margin-right: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    background-color: #eeeeee;
+    border-bottom: 6px solid red;
+}
+
+.divTableRow {
+    display: table-row;
+}
+
+.divTableHeading {
+    background-color: #EEE;
+    display: table-header-group;
+}
+
+.divTableCell, .divTableHead {
+    display: table-cell;
+    padding: 3px 10px;
+}
+
+.divTableHeading {
+    background-color: #EEE;
+    display: table-header-group;
+    font-weight: bold;
+}
+
+.divTableFoot {
+    background-color: #EEE;
+    display: table-footer-group;
+    font-weight: bold;
+}
+
+.divTableBody {
+    display: table-row-group;
+}
+
+    .divTableBody select {
+        color: white;
+        margin-left: 10px;
+        width: 100%;
+        padding: 5px;
+        border: none;
+        font-size: 20px;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+        -webkit-appearance: none;
+        outline: none;
+        cursor: pointer;
+    }
+
+.divTableBody input[type=text] {
+    background-color: #aa1111;
+    color: white;
+    margin-left: 10px;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    font-size: 20px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+    -webkit-appearance: button;
+    outline: none;
+}
+
+.divTableBody input[type=submit] {
+    background-color: #1a9349;
+    color: white;
+    margin-left: 10px;
+    padding: 12px;
+    border: none;
+    font-size: 20px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+    -webkit-appearance: button;
+    outline: none;
+}
+
+.divTableBody select option {
+    margin: 0px;
+}
