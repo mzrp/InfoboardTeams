@@ -353,6 +353,7 @@
     <Content Include="Views\Home\DeviceUsage.cshtml" />
     <Content Include="Views\Home\DeviceCounts.cshtml" />
     <Content Include="Views\Home\DeviceDistribution.cshtml" />
+    <Content Include="Views\Home\Dashboard.cshtml" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="App_GlobalResources\Resource.resx">

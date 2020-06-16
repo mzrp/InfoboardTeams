@@ -12,6 +12,10 @@ using System.Configuration;
 
 using System.Net;
 using System.IO;
+using System.Data.SqlClient;
+using System.Configuration;
+using System.Threading;
+using System.Globalization;
 
 namespace Microsoft_Teams_Graph_RESTAPIs_Connect.ImportantFiles
 {
@@ -38,9 +42,58 @@ namespace Microsoft_Teams_Graph_RESTAPIs_Connect.ImportantFiles
         public string AccessToken { get; set; }
     }
 
+    public class MsGraphSubscription
+    {
+        [JsonProperty(PropertyName = "@odata.context")]
+        public string ODataContext { get; set; }
+
+        public string id { get; set; }
+        public string resource { get; set; }
+        public string applicationId { get; set; }
+        public string changeType { get; set; }
+        public string clientState { get; set; }
+        public string notificationUrl { get; set; }
+        public DateTime expirationDateTime { get; set; }
+        public string creatorId { get; set; }
+        public string latestSupportedTlsVersion { get; set; }
+    }
+
+    public class User
+    {
+        public string id { get; set; }
+        public string displayName { get; set; }
+        public string tenantId { get; set; }
+    }
+
+    public class Organizer
+    {
+        public User user { get; set; }
+    }
+
+    public class Participant
+    {
+        public User user { get; set; }
+    }
+
+    public class CallRecord
+    {
+        [JsonProperty(PropertyName = "@odata.context")]
+        public string OdataContext { get; set; }
+        public int version { get; set; }
+        public string type { get; set; }
+        public IList<string> modalities { get; set; }
+        public DateTime lastModifiedDateTime { get; set; }
+        public DateTime startDateTime { get; set; }
+        public DateTime endDateTime { get; set; }
+        public string id { get; set; }
+        public Organizer organizer { get; set; }
+        public IList<Participant> participants { get; set; }
+    }
+
     public class GraphService : HttpHelpers
     {
         private string GraphRootUri = ConfigurationManager.AppSettings["ida:GraphRootUri"];
+        private string DatabaseConnectionString = ConfigurationManager.AppSettings["ida:DatabaseConnectionString"];
 
         /// <summary>
         /// Create new channel.
@@ -73,182 +126,103 @@ namespace Microsoft_Teams_Graph_RESTAPIs_Connect.ImportantFiles
             return await HttpGetList<TeamsApp>($"/teams/{teamId}/apps", endpoint: graphBetaEndpoint);
         }
 
-        public async Task<string> GetLoggedUserPresence(String accessToken)
-        {
-            // get logged user presence
-            string sMyPresence = await GetMyPresence(accessToken);
-            string sMyPresenceAvailability = sMyPresence.Split(',')[0];
-            string sMyPresenceActivity = sMyPresence.Split(',')[1];
-            System.Web.HttpContext.Current.Session["myPresence"] = sMyPresenceAvailability;
-            return sMyPresenceAvailability;
-        }
-
         /// <summary>
-        /// Get the current users' ids.
+        /// Create Subscription
         /// </summary>
         /// <param name="accessToken">Access token to validate user</param>
         /// <returns></returns>
-        public async Task<List<string>> GetUsersPresences(String accessToken, List<string> sAllTeamsUsers)
+        public async Task<string> CreateGraphSubscription(string accessToken)
         {
-            List<string> sAllTeamsUsersNew = sAllTeamsUsers;
+            string sResult = "n/a";
 
-            // get all teams users presences
-            for (int i = 0; i < sAllTeamsUsersNew.Count; i++)
+            try
             {
-                if (sAllTeamsUsersNew[i] != "")
+                var webRequestSUB = WebRequest.Create("https://graph.microsoft.com/v1.0/subscriptions") as HttpWebRequest;
+                if (webRequestSUB != null)
                 {
-                    string[] sUserSipDataArray = sAllTeamsUsersNew[i].Split(',');
-                    string sUserSip = sUserSipDataArray[0];
-                    string sSystemId = sUserSipDataArray[1];
-                    string sUserId = sUserSipDataArray[2];
-                    string sId = sUserSipDataArray[3];
-                    string sPresence = sUserSipDataArray[4];
+                    webRequestSUB.Method = WebRequestMethods.Http.Post;
+                    webRequestSUB.Host = "graph.microsoft.com";
+                    webRequestSUB.Headers.Add("Authorization", "Bearer " + accessToken);
+                    webRequestSUB.ContentType = "application/json";
 
-                    if ((sUserSip == "<LOGGEDUSER>") && (sPresence == "<PRESENCE>"))
+                    DateTime ExpirationDateTime = DateTime.UtcNow + new TimeSpan(1, 0, 0, 0);
+                    string sExpirationDateTime = ExpirationDateTime.Year.ToString().PadLeft(4, '0') + "-";
+                    sExpirationDateTime += ExpirationDateTime.Month.ToString().PadLeft(2, '0') + "-";
+                    sExpirationDateTime += ExpirationDateTime.Day.ToString().PadLeft(2, '0') + "T";
+                    sExpirationDateTime += ExpirationDateTime.Hour.ToString().PadLeft(2, '0') + ":";
+                    sExpirationDateTime += ExpirationDateTime.Minute.ToString().PadLeft(2, '0') + ":";
+                    sExpirationDateTime += ExpirationDateTime.Second.ToString().PadLeft(2, '0');
+                    sExpirationDateTime += ".9356913Z";
+
+                    //sExpirationDateTime += ExpirationDateTime.Millisecond.ToString().PadLeft(3, '0');
+                    //sExpirationDateTime += ".9356913Z";
+                    //DateTime exDT = DateTime.UtcNow + new TimeSpan(0, 0, 15, 0);
+
+                    string sParams = "{ ";
+                    sParams += "\"changeType\": \"created\", ";
+                    sParams += "\"notificationUrl\": \"https://infoboardteams.azurewebsites.net/Home/GetCallRecords\", ";
+                    sParams += "\"resource\": \"/communications/callRecords\", ";
+                    sParams += "\"expirationDateTime\": \"" + sExpirationDateTime + "\", ";
+                    sParams += "\"clientState\": \"" + Guid.NewGuid().ToString() + "\", ";
+                    sParams += "\"latestSupportedTlsVersion\": \"v1_2\" ";
+                    sParams += "}";
+
+                    // create subsccription starts
+                    DatabaseService dbService = new DatabaseService();
+                    string sLogEntry = sParams;
+                    string sLogDate = DateTime.Now.ToString();
+                    string sLogName = "MS Graph Validation";
+                    string sSQL = "INSERT INTO [dbo].[Log] ([LogEntry], [LogDate], [LogName]) ";
+                    sSQL += "VALUES ('" + sLogEntry + "', '" + sLogDate + "', '" + sLogName + "')";
+                    string sDbOk = dbService.InsertUpdateDatabase(sSQL);
+
+                    var data = Encoding.ASCII.GetBytes(sParams);
+                    webRequestSUB.ContentLength = data.Length;
+
+                    using (var sW = webRequestSUB.GetRequestStream())
                     {
-                        // get logged user presence
-                        string sMyPresence = await GetMyPresence(accessToken);
-                        string sMyPresenceAvailability = sMyPresence.Split(',')[0];
-                        string sMyPresenceActivity = sMyPresence.Split(',')[1];
-                        System.Web.HttpContext.Current.Session["myPresence"] = sMyPresenceAvailability;
-                        sAllTeamsUsersNew[i] = sUserSip + "," + sSystemId + "," + sUserId + "," + sId + "," + sMyPresenceAvailability;
+                        sW.Write(data, 0, data.Length);
                     }
 
-                    if ((sUserSip != "") && (sId == "<ID>") && (sPresence == "<PRESENCE>"))
+                    using (var rW = webRequestSUB.GetResponse().GetResponseStream())
                     {
-                        // get id
-                        string endpoint = "https://graph.microsoft.com/beta/users/" + sUserSip;
-                        HttpResponseMessage response = await ServiceHelper.SendRequest(HttpMethod.Get, endpoint, accessToken);
-                        if (response != null && response.IsSuccessStatusCode)
+                        using (var srW = new StreamReader(rW))
                         {
-                            var json = JObject.Parse(await response.Content.ReadAsStringAsync());
-                            string userid = json.GetValue("id").ToString();
+                            var sExportAsJson = srW.ReadToEnd();
 
-                            if (userid != null)
-                            {
-                                sId = userid;
-                                sAllTeamsUsersNew[i] = sUserSip + "," + sSystemId + "," + sUserId + "," + sId + ",<PRESENCE>";
-                            }
+                            // log subscription creation
+                            sLogEntry = sExportAsJson.Replace("'", "\"");
+                            sLogDate = DateTime.Now.ToString();
+                            sLogName = "Subscription";
+                            sSQL = "INSERT INTO [dbo].[Log] ([LogEntry], [LogDate], [LogName]) ";
+                            sSQL += "VALUES ('" + sLogEntry + "', '" + sLogDate + "', '" + sLogName + "')";
+                            sDbOk = dbService.InsertUpdateDatabase(sSQL);
+                            sResult = "Ok";
                         }
                     }
 
-                    if ((sUserSip != "") && (sId != "<ID>") && (sPresence == "<PRESENCE>"))
-                    {
-                        string endpoint = "https://graph.microsoft.com/beta/users/" + sId + "/presence";
-                        HttpResponseMessage response = await ServiceHelper.SendRequest(HttpMethod.Get, endpoint, accessToken);
-                        if (response != null && response.IsSuccessStatusCode)
-                        {
-                            var json = JObject.Parse(await response.Content.ReadAsStringAsync());
-                            string userpresence = json.GetValue("availability").ToString();
-                            if (userpresence != null)
-                            {
-                                sPresence = userpresence;
-                                sAllTeamsUsersNew[i] = sUserSip + "," + sSystemId + "," + sUserId + "," + sId + "," + sPresence;
-                            }
-                        }
-                    }
+                    webRequestSUB = null;
                 }
             }
-
-            return sAllTeamsUsersNew;
-        }
-
-        /// <summary>
-        /// Get the current users' ids.
-        /// </summary>
-        /// <param name="accessToken">Access token to validate user</param>
-        /// <returns></returns>
-        public async Task<List<string>> GetUsersPresencesSingleFile(String accessToken)
-        {
-            List<string> sAllTeamsUsers = (List<string>)System.Web.HttpContext.Current.Session["sesAllTeamsUsers"];
-
-            // get all teams users presences
-            if (sAllTeamsUsers.Count > 0)
+            catch (Exception ex)
             {
-                for (int i=0; i< sAllTeamsUsers.Count; i++)
-                {
-                    if (sAllTeamsUsers[i] != "")
-                    {
-                        string[] sUserSipDataArray = sAllTeamsUsers[i].Split(',');
-                        string sUserSip = sUserSipDataArray[0];
-                        string sSystemId = sUserSipDataArray[1];
-                        string sUserId = sUserSipDataArray[2];
-                        string sId = sUserSipDataArray[3];
-                        string sPresence = sUserSipDataArray[4];
+                // create subsccription error
+                DatabaseService dbService = new DatabaseService();
+                string sLogEntry = ex.ToString().Replace("'", "\"");
+                string sLogDate = DateTime.Now.ToString();
+                string sLogName = "MS Graph Validation";
+                string sSQL = "INSERT INTO [dbo].[Log] ([LogEntry], [LogDate], [LogName]) ";
+                sSQL += "VALUES ('" + sLogEntry + "', '" + sLogDate + "', '" + sLogName + "')";
+                string sDbOk = dbService.InsertUpdateDatabase(sSQL);
 
-                        if ((sUserSip == "<LOGGEDUSER>") && (sPresence == "<PRESENCE>"))
-                        {
-                            // get logged user presence
-                            string sMyPresence = await GetMyPresence(accessToken);
-                            string sMyPresenceAvailability = sMyPresence.Split(',')[0];
-                            string sMyPresenceActivity = sMyPresence.Split(',')[1];
-                            System.Web.HttpContext.Current.Session["myPresence"] = sMyPresenceAvailability;
-                            sAllTeamsUsers[i] = sUserSip + "," + sSystemId + "," + sUserId + "," + sId + "," + sMyPresenceAvailability;
-                            return sAllTeamsUsers;
-                        }
-
-                        if ((sUserSip != "") && (sId == "<ID>") && (sPresence == "<PRESENCE>"))
-                        {
-                            // get id
-                            string endpoint = "https://graph.microsoft.com/beta/users/" + sUserSip;
-                            HttpResponseMessage response = await ServiceHelper.SendRequest(HttpMethod.Get, endpoint, accessToken);
-                            if (response != null && response.IsSuccessStatusCode)
-                            {
-                                var json = JObject.Parse(await response.Content.ReadAsStringAsync());
-                                string userid = json.GetValue("id").ToString();
-
-                                if (userid != null)
-                                {
-                                    sId = userid;
-                                    sAllTeamsUsers[i] = sUserSip + "," + sSystemId + "," + sUserId + "," + sId + ",<PRESENCE>";
-                                    return sAllTeamsUsers;
-                                }
-                            }
-                        }
-
-                        if ((sUserSip != "") && (sId != "<ID>") && (sPresence == "<PRESENCE>"))
-                        {
-                            string endpoint = "https://graph.microsoft.com/beta/users/" + sId + "/presence";
-                            HttpResponseMessage response = await ServiceHelper.SendRequest(HttpMethod.Get, endpoint, accessToken);
-                            if (response != null && response.IsSuccessStatusCode)
-                            {
-                                var json = JObject.Parse(await response.Content.ReadAsStringAsync());
-                                string userpresence = json.GetValue("availability").ToString();
-                                if (userpresence != null)
-                                {
-                                    sPresence = userpresence;
-                                    sAllTeamsUsers[i] = sUserSip + "," + sSystemId + "," + sUserId + "," + sId + "," + sPresence;
-                                    return sAllTeamsUsers;
-                                }
-                            }
-                        }
-                    }
-                }
+                sResult = ex.ToString();
             }
 
-            return sAllTeamsUsers;
+            return sResult;
         }
 
         /// <summary>
-        /// Get the current user's presence.
-        /// </summary>
-        /// <param name="accessToken">Access token to validate user</param>
-        /// <returns></returns>
-        public async Task<string> GetUserId(String accessToken, string sSip)
-        {
-            string endpoint = "https://graph.microsoft.com/beta/users/" + sSip;
-            String userid = "n/a";
-            HttpResponseMessage response = await ServiceHelper.SendRequest(HttpMethod.Get, endpoint, accessToken);
-            if (response != null && response.IsSuccessStatusCode)
-            {
-                var json = JObject.Parse(await response.Content.ReadAsStringAsync());
-                userid = json.GetValue("id").ToString();
-            }
-            return userid?.Trim();
-        }
-
-        /// <summary>
-        /// Get Auth TOken
+        /// Get Auth Token
         /// </summary>
         /// <param name="accessToken">Access token to validate user</param>
         /// <returns></returns>
@@ -292,7 +266,7 @@ namespace Microsoft_Teams_Graph_RESTAPIs_Connect.ImportantFiles
                             System.Web.HttpContext.Current.Session["AuthTokenType"] = sTokenType;
                             System.Web.HttpContext.Current.Session["AuthTokenExpireIn"] = AuthTokenExpireIn;
 
-                            sResult = sAuthToken;
+                            sResult = "Ok";
                         }
                     }
 
@@ -301,7 +275,7 @@ namespace Microsoft_Teams_Graph_RESTAPIs_Connect.ImportantFiles
             }
             catch (Exception ex)
             {
-                ex.ToString();
+                sResult = ex.ToString();
             }
 
             return sResult;
@@ -527,7 +501,100 @@ namespace Microsoft_Teams_Graph_RESTAPIs_Connect.ImportantFiles
         }
 
         /// <summary>
-        /// Get report - users team details.
+        /// Get report - call reocrds details.
+        /// </summary>
+        /// <param name="accessToken">Access token to validate user</param>
+        /// <returns></returns>
+        public async Task<string> GetDashboardGraphData(String accessToken)
+        {
+            string sResult = "n/a";
+
+            string sStartDate = DateTime.Now.Year.ToString().PadLeft(4, '0') + "-" + DateTime.Now.Month.ToString().PadLeft(2, '0') + "-" + DateTime.Now.Day.ToString().PadLeft(2, '0') + "T00:00:00";
+            string sEndDate = DateTime.Now.Year.ToString().PadLeft(4, '0') + "-" + DateTime.Now.Month.ToString().PadLeft(2, '0') + "-" + DateTime.Now.Day.ToString().PadLeft(2, '0') + "T23:59:59";
+
+            Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
+            string strSqlQuery = "SELECT [LogEntry] FROM [dbo].[Log]  WHERE [LogName] = 'CallRecord' AND [LogDate] > '" + sStartDate + "' AND [LogDate] < '" + sEndDate + "' ORDER BY [LogDate] DESC";
+
+            SqlConnection DatabaseFile = new SqlConnection(@DatabaseConnectionString);
+            DatabaseFile.Open();
+
+            try
+            {
+                using (SqlCommand commandSqlTeams = new SqlCommand(strSqlQuery, DatabaseFile))
+                {
+                    using (SqlDataReader reader = commandSqlTeams.ExecuteReader())
+                    {
+                        sResult = "<table cellspacing='3' cellpadding='3'>";
+
+                        sResult += "<tr>";
+                        sResult += "<th>Organizer</th>";
+                        sResult += "<th>Participants</th>";
+                        sResult += "<th>Start</th>";
+                        sResult += "<th>End</th>";
+                        sResult += "</tr>";
+
+                        bool bCallsExists = false;
+
+                        while (reader.Read())
+                        {
+                            if (!reader.IsDBNull(0))
+                            {
+                                string sExportAsJson = reader.GetString(0);
+                                CallRecord notifiedCall = JsonConvert.DeserializeObject<CallRecord>(sExportAsJson.ToString());
+
+                                sResult += "<tr>";
+                                sResult += "<td>" + notifiedCall.organizer.user.displayName + "</td>";
+
+                                sResult += "<td>";
+                                for (int i = 0; i < notifiedCall.participants.Count; i++)
+                                {
+                                    sResult += notifiedCall.participants[i].user.displayName;
+                                    if (i < notifiedCall.participants.Count - 1)
+                                    {
+                                        sResult += ", ";
+                                    }
+                                }
+                                sResult += "</td>";
+
+                                sResult += "<td>" + notifiedCall.startDateTime.ToString() + "</td>";
+                                sResult += "<td>" + notifiedCall.endDateTime.ToString() + "</td>";
+
+                                sResult += "</tr>";
+
+                                bCallsExists = true;
+                            }
+                        }
+
+                        if (bCallsExists == false)
+                        {
+                            sResult += "<tr><td colspan='4'>No calls exist today (" + DateTime.Now.ToString() + ")</td></tr>";
+                        }
+
+                        sResult += "</table>";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // log call records error
+                DatabaseService dbService = new DatabaseService();
+                string sLogEntry = ex.ToString().Replace("'", "\"");
+                string sLogDate = DateTime.Now.ToString();
+                string sLogName = "CallRecord Error";
+                string sSQL = "INSERT INTO [dbo].[Log] ([LogEntry], [LogDate], [LogName]) ";
+                sSQL += "VALUES ('" + sLogEntry + "', '" + sLogDate + "', '" + sLogName + "')";
+                string ssDbOk = dbService.InsertUpdateDatabase(sSQL);
+                sResult = "";
+            }
+
+            DatabaseFile.Close();
+
+            System.Web.HttpContext.Current.Session["userDetails"] = sResult;
+            return sResult;
+        }
+
+        /// <summary>
+        /// Get report - device distribution details.
         /// </summary>
         /// <param name="accessToken">Access token to validate user</param>
         /// <returns></returns>

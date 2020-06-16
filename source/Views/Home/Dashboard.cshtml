@@ -24,8 +24,8 @@
             $.ajax({
                 type: "POST",
                 traditional: true,
-                url: 'Ora',
-                data: { TRP: '1' },
+                url: 'Home/Ora',
+                data: { TRP: '7' },
                 success: function (html) {
                     $('#idOra').html(html);
                 }
@@ -35,7 +35,7 @@
         // Timer function
         $(document).ready(function () { 
             getTimeFromserver();
-            setInterval('getTimeFromserver();', 600000);
+            setInterval('getTimeFromserver();', 60000);
         });
 
 </script>

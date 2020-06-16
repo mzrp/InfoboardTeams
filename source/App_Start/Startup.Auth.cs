@@ -28,6 +28,7 @@ namespace Microsoft_Teams_Graph_RESTAPIs_Connect
         private static string redirectUri = ConfigurationManager.AppSettings["ida:RedirectUri"];
         private static string graphScopes = ConfigurationManager.AppSettings["ida:GraphScopes"];
         private static string authority = "https://login.microsoftonline.com/common/v2.0";
+
         public void ConfigureAuth(IAppBuilder app)
         {
             app.SetDefaultSignInAsAuthenticationType(CookieAuthenticationDefaults.AuthenticationType);
